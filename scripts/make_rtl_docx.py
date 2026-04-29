@@ -371,6 +371,7 @@ def patch_generated_docx(docx_path: Path) -> None:
     with zipfile.ZipFile(docx_path) as z:
         z.extractall(work_dir)
 
+    add_headers_and_footers(work_dir)
     patch_document_xml(work_dir / "word" / "document.xml")
 
     docx_path.unlink()
@@ -379,6 +380,146 @@ def patch_generated_docx(docx_path: Path) -> None:
             if path.is_file():
                 z.write(path, path.relative_to(work_dir).as_posix())
     shutil.rmtree(work_dir)
+
+
+# ============================================================
+# الرؤوس والتذييلات وأرقام الصفحات
+# ============================================================
+
+# عنوان الكتاب — يَظهَرُ في رَأسِ الصَّفحة في كلِّ صفحات الكتاب ما عدا الأَوائل.
+HEADER_TITLE = "غريب في طيبة"
+
+# قالب رأس الصفحة (عنوان الكتاب وسط، خطّ Amiri صغير، اتّجاه RTL، حدّ سُفليّ خفيف)
+HEADER_DEFAULT_XML = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr>
+      <w:bidi />
+      <w:jc w:val="center" />
+      <w:pBdr>
+        <w:bottom w:val="single" w:sz="4" w:space="4" w:color="999999" />
+      </w:pBdr>
+      <w:spacing w:before="0" w:after="120" />
+    </w:pPr>
+    <w:r>
+      <w:rPr>
+        <w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" w:cs="{ARABIC_BODY_FONT}" />
+        <w:i />
+        <w:iCs />
+        <w:color w:val="666666" />
+        <w:sz w:val="20" />
+        <w:szCs w:val="20" />
+      </w:rPr>
+      <w:t xml:space="preserve">{HEADER_TITLE}</w:t>
+    </w:r>
+  </w:p>
+</w:hdr>'''
+
+# رأس صفحة الـفصل/العنوان (فارغ — لا نريد رأسًا فوق صفحة بداية الفصل)
+HEADER_EMPTY_XML = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:bidi /><w:jc w:val="center" /></w:pPr>
+  </w:p>
+</w:hdr>'''
+
+# تَذييل افتراضيّ — رَقم الصَّفحة في المُنتَصَف بِالأَرقام العربيّة-الهنديّة (١٢٣)
+FOOTER_DEFAULT_XML = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr>
+      <w:bidi />
+      <w:jc w:val="center" />
+      <w:spacing w:before="120" w:after="0" />
+    </w:pPr>
+    <w:r>
+      <w:rPr>
+        <w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" w:cs="{ARABIC_BODY_FONT}" />
+        <w:color w:val="666666" />
+        <w:sz w:val="20" />
+        <w:szCs w:val="20" />
+      </w:rPr>
+      <w:fldChar w:fldCharType="begin" />
+    </w:r>
+    <w:r>
+      <w:rPr>
+        <w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" w:cs="{ARABIC_BODY_FONT}" />
+        <w:color w:val="666666" />
+        <w:sz w:val="20" />
+        <w:szCs w:val="20" />
+      </w:rPr>
+      <w:instrText xml:space="preserve"> PAGE \\* MERGEFORMAT </w:instrText>
+    </w:r>
+    <w:r>
+      <w:rPr>
+        <w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" w:cs="{ARABIC_BODY_FONT}" />
+        <w:color w:val="666666" />
+        <w:sz w:val="20" />
+        <w:szCs w:val="20" />
+      </w:rPr>
+      <w:fldChar w:fldCharType="end" />
+    </w:r>
+  </w:p>
+</w:ftr>'''
+
+# تَذييل الصَّفحة الأُولى (صفحة العنوان) — فارغ
+FOOTER_EMPTY_XML = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:bidi /><w:jc w:val="center" /></w:pPr>
+  </w:p>
+</w:ftr>'''
+
+
+def add_headers_and_footers(work_dir: Path) -> None:
+    """يُضيفُ ملفَّات الرأس/التذييل ويسجِّلُها في الـrelationships وContent_Types.
+
+    لا نُضيفُ مراجعَ في sectPr هنا — يَفعَلُه patch_document_xml بعد ذلك،
+    لأنّه يَستبدِلُ sectPr بأكمَلِه.
+    """
+    word_dir = work_dir / "word"
+    rels_dir = word_dir / "_rels"
+
+    (word_dir / "header1.xml").write_text(HEADER_DEFAULT_XML, encoding="utf-8")
+    (word_dir / "header2.xml").write_text(HEADER_EMPTY_XML, encoding="utf-8")
+    (word_dir / "footer1.xml").write_text(FOOTER_DEFAULT_XML, encoding="utf-8")
+    (word_dir / "footer2.xml").write_text(FOOTER_EMPTY_XML, encoding="utf-8")
+
+    # تَسجيلٌ في word/_rels/document.xml.rels
+    rels_path = rels_dir / "document.xml.rels"
+    rels_text = rels_path.read_text(encoding="utf-8")
+    extra_rels = (
+        '<Relationship Id="rId100" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" '
+        'Target="header1.xml" />'
+        '<Relationship Id="rId101" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" '
+        'Target="header2.xml" />'
+        '<Relationship Id="rId102" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" '
+        'Target="footer1.xml" />'
+        '<Relationship Id="rId103" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" '
+        'Target="footer2.xml" />'
+    )
+    rels_text = rels_text.replace("</Relationships>", extra_rels + "</Relationships>")
+    rels_path.write_text(rels_text, encoding="utf-8")
+
+    # تَسجيلٌ في [Content_Types].xml
+    ct_path = work_dir / "[Content_Types].xml"
+    ct_text = ct_path.read_text(encoding="utf-8")
+    extra_ct = (
+        '<Override PartName="/word/header1.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml" />'
+        '<Override PartName="/word/header2.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml" />'
+        '<Override PartName="/word/footer1.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml" />'
+        '<Override PartName="/word/footer2.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml" />'
+    )
+    ct_text = ct_text.replace("</Types>", extra_ct + "</Types>")
+    ct_path.write_text(ct_text, encoding="utf-8")
 
 
 def _apply_group_heading(text: str) -> str:
@@ -442,6 +583,73 @@ def _style_title_page(text: str) -> str:
     return text
 
 
+def _add_half_title_page(text: str) -> str:
+    """يَحقُنُ صفحة شطر العنوان (Half-title) قبل صفحة العنوان الرئيسة.
+
+    شطرُ العنوان عُرفٌ نَشريٌّ كلاسيكيّ: صفحةٌ مُنفَردة تَحوي اسمَ الكتاب وحدَه،
+    تَأتي قبل صفحة العنوان الكاملة (العنوان + المؤلف + الناشر).
+    """
+    half_title = (
+        '<w:p>'
+        '<w:pPr>'
+        '<w:bidi />'
+        '<w:jc w:val="center" />'
+        f'<w:spacing w:before="4800" w:after="0" w:line="{LINE_HEIGHT}" w:lineRule="auto" />'
+        '</w:pPr>'
+        '<w:r>'
+        '<w:rPr>'
+        f'<w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" '
+        f'w:cs="{ARABIC_BODY_FONT}" />'
+        '<w:b /><w:bCs />'
+        '<w:color w:val="1F4E79" />'
+        '<w:sz w:val="56" /><w:szCs w:val="56" />'
+        '</w:rPr>'
+        f'<w:t xml:space="preserve">{HEADER_TITLE}</w:t>'
+        '</w:r>'
+        '</w:p>'
+    )
+    # نَحقُنُها مباشرةً بعد <w:body>. نمطُ Title له pageBreakBefore فيَدفَعُ
+    # العنوانَ الرئيسَ إلى صفحةٍ جديدة.
+    text = text.replace("<w:body>", "<w:body>" + half_title, 1)
+    return text
+
+
+def _split_title_section(text: str) -> str:
+    """يَحقُنُ فاصلَ مَقطَعٍ (sectPr) بعد فقرة Author مباشرةً.
+
+    النَّتيجة: صفحتا الافتتاح (شطر العنوان + صفحة العنوان الرئيسة) تَكونان
+    في مَقطَعٍ مُستَقِلٍّ بلا رأسٍ ولا تَذييل ولا أرقامِ صَفحات؛ ويُستَأنَفُ
+    التَّرقيم من ١ في المَقطَع التالي.
+    """
+    page_size = f'<w:pgSz w:w="{PAGE_W}" w:h="{PAGE_H}" />'
+    page_margin = (
+        f'<w:pgMar w:top="{MARGIN_TOP}" w:right="{MARGIN_INNER}" '
+        f'w:bottom="{MARGIN_BOTTOM}" w:left="{MARGIN_OUTER}" '
+        f'w:header="{MARGIN_HEADER}" w:footer="{MARGIN_FOOTER}" w:gutter="0" />'
+    )
+
+    # مَقطَع صفحات الافتتاح: لا رؤوس ولا تَذييلات ولا ترقيم
+    front_section_pr = (
+        '<w:pPr><w:sectPr>'
+        f'{page_size}{page_margin}'
+        '<w:bidi />'
+        '<w:cols w:space="708" />'
+        '<w:docGrid w:linePitch="360" />'
+        '</w:sectPr></w:pPr>'
+    )
+
+    # نَجِدُ فقرة Author ونَحقُنُ فاصلَ مَقطَعٍ بَعدَها مباشرةً.
+    # شكلُ الفقرة كما يَخرُجُ بَعد _style_title_page:
+    # <w:p><w:pPr><w:pStyle w:val="Author" /></w:pPr>...</w:p>
+    author_pattern = re.compile(
+        r'(<w:p><w:pPr><w:pStyle w:val="Author"\s*/></w:pPr>'
+        r'<w:r><w:t[^>]*>[^<]+</w:t></w:r></w:p>)',
+    )
+    section_break_para = f'<w:p>{front_section_pr}</w:p>'
+    text = author_pattern.sub(r'\1' + section_break_para, text, count=1)
+    return text
+
+
 def _strip_redundant_horizontal_rules(text: str) -> str:
     """يحذف فقرات الخطّ الأفقيّ (---) التي تَكونُ وحيدةً أو زائدةً.
 
@@ -485,6 +693,13 @@ def patch_document_xml(path: Path) -> None:
     # --- (3) إزالة الخطوط الفاصلة الزائدة قبل العناوين التي تبدأ صفحة جديدة ---
     text = _strip_redundant_horizontal_rules(text)
 
+    # --- (4) إضافة صفحة شطر العنوان (Half-title) قبل صفحة العنوان الرَّئيسة ---
+    text = _add_half_title_page(text)
+
+    # --- (5) فاصلٌ مَقطَعيّ بعد صفحة العنوان حتّى تَخلوَ صفحتا الافتتاح
+    #         (شطر العنوان + العنوان الرئيس) من رأسٍ وتَذييل وأرقامِ صَفحات ---
+    text = _split_title_section(text)
+
     page_size = f'<w:pgSz w:w="{PAGE_W}" w:h="{PAGE_H}" />'
     # هوامش مرآويّة: w:gutter ليس مفيدًا هنا — نضبط top/right/bottom/left
     # في كتاب عربيّ مجلَّد على اليمين: العمود اليمين = داخل (inner)، اليسار = خارج (outer)
@@ -494,12 +709,27 @@ def patch_document_xml(path: Path) -> None:
         f'w:header="{MARGIN_HEADER}" w:footer="{MARGIN_FOOTER}" w:gutter="0" />'
     )
 
+    # مَراجع الرَّأس والتَّذييل (أَنشَأناها في add_headers_and_footers).
+    # type="default" للصفحات العاديّة، type="first" لصفحة العنوان (يُفعَّل بـ<w:titlePg/>).
+    header_footer_refs = (
+        '<w:headerReference r:id="rId100" w:type="default" />'
+        '<w:headerReference r:id="rId101" w:type="first" />'
+        '<w:footerReference r:id="rId102" w:type="default" />'
+        '<w:footerReference r:id="rId103" w:type="first" />'
+    )
+
+    # أرقام الصَّفحات بالأَرقام العربيّة-الهنديّة (١٢٣)
+    page_num = '<w:pgNumType w:fmt="hindiNumbers" />'
+
     new_sect_pr = (
         f'<w:sectPr>'
+        f'{header_footer_refs}'
         f'{page_size}'
         f'{page_margin}'
+        f'{page_num}'
         f'<w:bidi />'
         f'<w:cols w:space="708" />'
+        f'<w:titlePg />'
         f'<w:docGrid w:linePitch="360" />'
         f'</w:sectPr>'
     )
