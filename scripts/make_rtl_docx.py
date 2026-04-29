@@ -1012,10 +1012,17 @@ def patch_document_xml(path: Path) -> None:
         f'</w:sectPr>'
     )
 
-    if re.search(r"<w:sectPr\b[^>]*?/>", text):
-        text = re.sub(r"<w:sectPr\b[^>]*?/>", new_sect_pr, text)
-    elif "<w:sectPr" in text:
-        text = re.sub(r"<w:sectPr\b.*?</w:sectPr>", new_sect_pr, text, flags=re.DOTALL)
+    # نَستَهدِفُ sectPr الجَسَد فقط (الطِّفل المُباشِر لـ<w:body>).
+    # sectPr صفحات الافتِتاح الَّذي حَقَنه _split_title_section مَلفوفٌ داخل
+    # <w:pPr>...</w:pPr> ويَجبُ ألَّا يُستَبدَل، وإلَّا فُقدَت إعداداتُه النَّظيفة
+    # (بلا رؤوس/تَذييلات/أرقام صفحات) الَّتي تَحمي صَفحَتَي الافتتاح.
+    # نَستَخدِمُ negative lookbehind لاستِبعاد sectPr المَسبوق بـ<w:pPr> مُباشرة.
+    body_sect_self_closing = r"(?<!<w:pPr>)<w:sectPr\b[^>]*?/>"
+    body_sect_with_children = r"(?<!<w:pPr>)<w:sectPr\b[^>]*?>.*?</w:sectPr>"
+    if re.search(body_sect_self_closing, text):
+        text = re.sub(body_sect_self_closing, new_sect_pr, text)
+    elif re.search(body_sect_with_children, text, flags=re.DOTALL):
+        text = re.sub(body_sect_with_children, new_sect_pr, text, flags=re.DOTALL)
     else:
         text = text.replace("</w:body>", f"{new_sect_pr}</w:body>")
 
