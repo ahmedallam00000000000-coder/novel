@@ -595,6 +595,22 @@ FOOTER_DEFAULT_XML = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
         <w:color w:val="{COLOR_MUTED}" />
         <w:sz w:val="22" /><w:szCs w:val="22" />
       </w:rPr>
+      <w:fldChar w:fldCharType="separate" />
+    </w:r>
+    <w:r>
+      <w:rPr>
+        <w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" w:cs="{ARABIC_BODY_FONT}" />
+        <w:color w:val="{COLOR_MUTED}" />
+        <w:sz w:val="22" /><w:szCs w:val="22" />
+      </w:rPr>
+      <w:t>1</w:t>
+    </w:r>
+    <w:r>
+      <w:rPr>
+        <w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" w:cs="{ARABIC_BODY_FONT}" />
+        <w:color w:val="{COLOR_MUTED}" />
+        <w:sz w:val="22" /><w:szCs w:val="22" />
+      </w:rPr>
       <w:fldChar w:fldCharType="end" />
     </w:r>
     <w:r>
