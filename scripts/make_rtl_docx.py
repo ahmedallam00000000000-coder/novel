@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """
-يُولِّد نسخة DOCX من المخطوط مع ضبط الاتّجاه العربيّ (من اليمين إلى اليسار)،
-وخطٍّ عربيٍّ ملائم للنشر، وهوامش مناسبة لكتاب عربيّ مطبوع.
-
-Generates a Word .docx from the manuscript with RTL paragraph direction,
-Arabic-friendly fonts, and book-style page margins.
+يُولِّد نسخة DOCX احترافيّة من المخطوط بتنسيق كتاب عربيّ منشور:
+- اتّجاه نصّ وصفحة من اليمين إلى اليسار (RTL)
+- خطّ عربيّ ملائم للنشر (Amiri)
+- صفحة بحجم A5 (148 × 210 مم) — بمقاس روائيّ
+- هوامش غير متماثلة مرآويّة (داخل/خارج) لكتاب مطبوع
+- عنوان كبير في صفحة مستقلّة
+- بداية كلّ قسم/فصل في صفحة جديدة، عناوين في المنتصف
+- اقتباسات (epigraphs) في المنتصف بخطّ مائل
+- مسافة بادئة لأوّل سطر في الفقرات (طريقة الكتب المنشورة)
+- تباعد سطور 1.5 لراحة القراءة
 
 Usage:
     python3 scripts/make_rtl_docx.py
@@ -23,31 +28,56 @@ TARGET_DOCX = ROOT / "غريب_في_طيبة.docx"
 REFERENCE_DOCX = ROOT / "scripts" / "reference-rtl.docx"
 
 
-# الخطوط المستعملة:
-#   - "Amiri" أو "Traditional Arabic" — خطوط نسخ ملائمة لمتن الكتاب.
-#   - "Cairo" أو "Tajawal" — خطوط حديثة للعناوين.
-# نضع Amiri أوّلًا لأنّه مفتوح المصدر ومتاح، ثمّ Traditional Arabic كاحتياطيّ.
+# الخطّ الأساسيّ (يمكن تغييره — الخطوط البديلة المتوفّرة عادةً:
+# Traditional Arabic, Cairo, Tajawal, Lateef, Scheherazade, Arabic Typesetting).
 ARABIC_BODY_FONT = "Amiri"
-ARABIC_HEADING_FONT = "Cairo"
 
-# حجم الخطّ الافتراضيّ للمتن (بالأنصاف-نقاط — w:sz val="28" => 14pt)
-BODY_FONT_SIZE_HALFPOINTS = "28"  # 14pt — مناسب لكتب الرواية بالعربيّة
-HEADING1_SIZE_HALFPOINTS = "44"   # 22pt
-HEADING2_SIZE_HALFPOINTS = "36"   # 18pt
-HEADING3_SIZE_HALFPOINTS = "32"   # 16pt
+# ================== أحجام الخطوط بالأنصاف-نقاط ==================
+# (w:sz val="28" => 14pt)  أنصاف-نقاط = نقاط × 2
+SZ_BODY = "26"        # 13pt للمتن — مناسب لكتاب A5
+SZ_FIRST_PARA = "26"
+SZ_BLOCK = "24"       # 12pt للاقتباسات
+SZ_TITLE = "72"       # 36pt لعنوان الكتاب
+SZ_SUBTITLE = "32"    # 16pt
+SZ_AUTHOR = "32"      # 16pt
+SZ_H1 = "44"          # 22pt للأقسام
+SZ_H2 = "36"          # 18pt للفصول
+SZ_H3 = "30"          # 15pt للعناوين الفرعيّة
 
+# ================== أبعاد الصفحة بالـ twips (567 ≈ 1سم) ==================
+# A5: 14.8 × 21.0 سم  (8392 × 11906 twips تقريبًا)
+PAGE_W = "8391"       # عرض A5
+PAGE_H = "11906"      # ارتفاع A5
+
+# هوامش مرآويّة (داخل/خارج) — مناسبة للتجليد العربيّ
+MARGIN_TOP = "1134"     # 2.0سم
+MARGIN_BOTTOM = "1134"  # 2.0سم
+MARGIN_INNER = "1418"   # 2.5سم (الجهة المجلَّدة — اليمين في الكتاب العربيّ)
+MARGIN_OUTER = "1134"   # 2.0سم
+MARGIN_HEADER = "709"
+MARGIN_FOOTER = "709"
+
+
+# ================== خصائص الفقرات ==================
+# تباعد السطور (line spacing). 360 = 1.5 سطر
+LINE_HEIGHT = "360"
+# المسافة البادئة لأوّل سطر في فقرات المتن (twips)، 567 = 1سم
+FIRST_LINE_INDENT = "567"
+
+
+# ============================================================
+# توليد القالب المرجعيّ (reference-rtl.docx)
+# ============================================================
 
 def make_reference_docx() -> Path:
-    """يأخذ reference.docx الافتراضيّ من pandoc ويعدّله ليصير عربيًّا RTL."""
+    """يأخذ reference.docx الافتراضيّ من pandoc ويعدّله ليصير قالبًا عربيًّا احترافيًّا."""
     REFERENCE_DOCX.parent.mkdir(parents=True, exist_ok=True)
-    # توليد reference.docx الافتراضيّ
     default_ref = ROOT / "scripts" / "_pandoc-default-reference.docx"
     subprocess.run(
         ["pandoc", "-o", str(default_ref), "--print-default-data-file", "reference.docx"],
         check=True,
     )
 
-    # نفك الضغط، ونعدّل الملفّات الداخليّة، ثمّ نعيد الضغط
     work_dir = ROOT / "scripts" / "_refdocx_work"
     if work_dir.exists():
         shutil.rmtree(work_dir)
@@ -58,7 +88,6 @@ def make_reference_docx() -> Path:
     patch_styles_xml(work_dir / "word" / "styles.xml")
     patch_settings_xml(work_dir / "word" / "settings.xml")
 
-    # إعادة الضغط بترتيب الملفّات الأصليّ
     if REFERENCE_DOCX.exists():
         REFERENCE_DOCX.unlink()
     with zipfile.ZipFile(REFERENCE_DOCX, "w", zipfile.ZIP_DEFLATED) as z:
@@ -66,65 +95,246 @@ def make_reference_docx() -> Path:
             if path.is_file():
                 z.write(path, path.relative_to(work_dir).as_posix())
 
-    # تنظيف
     shutil.rmtree(work_dir)
     default_ref.unlink()
-
     return REFERENCE_DOCX
 
 
+def replace_style(text: str, style_id: str, new_block: str) -> str:
+    """يستبدل كتلة style كاملة بتعريف جديد."""
+    pattern = rf'<w:style\s+w:type="paragraph"[^>]*\bw:styleId="{re.escape(style_id)}"[^>]*>.*?</w:style>'
+    if not re.search(pattern, text, flags=re.DOTALL):
+        # إن لم يوجد، أضف قبل </w:styles>
+        return text.replace("</w:styles>", new_block + "\n</w:styles>")
+    return re.sub(pattern, lambda m: new_block, text, count=1, flags=re.DOTALL)
+
+
+def font_run(size: str, *, bold: bool = False, italic: bool = False, color: str | None = None) -> str:
+    """يبني <w:rPr> مع خطّ عربيّ وحجم وخصائص اختياريّة."""
+    parts = [f'<w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" '
+             f'w:cs="{ARABIC_BODY_FONT}" />']
+    if bold:
+        parts.append('<w:b />')
+        parts.append('<w:bCs />')
+    if italic:
+        parts.append('<w:i />')
+        parts.append('<w:iCs />')
+    if color:
+        parts.append(f'<w:color w:val="{color}" />')
+    parts.append(f'<w:sz w:val="{size}" />')
+    parts.append(f'<w:szCs w:val="{size}" />')
+    return "<w:rPr>" + "".join(parts) + "</w:rPr>"
+
+
 def patch_styles_xml(path: Path) -> None:
-    """يضيف bidi إلى الفقرات وخطًّا عربيًّا للنصوص (cs=complex script)."""
+    """يستبدل أنماط Pandoc الافتراضيّة بأنماط احترافيّة لكتاب عربيّ."""
     text = path.read_text(encoding="utf-8")
 
-    # 1) ضبط الخطّ الافتراضيّ للنصّ المركّب (Arabic) في docDefaults
-    #    نستبدل سطر rFonts ليتضمّن w:cs (complex script font) باسم خطّنا العربيّ.
-    new_rfonts = (
-        f'<w:rFonts w:asciiTheme="minorHAnsi" w:eastAsiaTheme="minorHAnsi" '
-        f'w:hAnsiTheme="minorHAnsi" w:cs="{ARABIC_BODY_FONT}" w:cstheme="minorBidi" />'
-    )
+    # -------- (1) docDefaults: خطّ افتراضيّ عربيّ + bidi افتراضيّ + تباعد --------
+    new_doc_defaults = f'''<w:docDefaults>
+    <w:rPrDefault>
+      <w:rPr>
+        <w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" w:cs="{ARABIC_BODY_FONT}" w:eastAsiaTheme="minorHAnsi" />
+        <w:sz w:val="{SZ_BODY}" />
+        <w:szCs w:val="{SZ_BODY}" />
+        <w:lang w:val="ar-SA" w:eastAsia="ar-SA" w:bidi="ar-SA" />
+      </w:rPr>
+    </w:rPrDefault>
+    <w:pPrDefault>
+      <w:pPr>
+        <w:bidi />
+        <w:spacing w:before="0" w:after="120" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
+        <w:jc w:val="both" />
+      </w:pPr>
+    </w:pPrDefault>
+  </w:docDefaults>'''
     text = re.sub(
-        r'<w:rFonts w:asciiTheme="minorHAnsi" w:eastAsiaTheme="minorHAnsi" '
-        r'w:hAnsiTheme="minorHAnsi" w:cstheme="minorBidi" />',
-        new_rfonts,
+        r"<w:docDefaults>.*?</w:docDefaults>",
+        lambda m: new_doc_defaults,
         text,
         count=1,
+        flags=re.DOTALL,
     )
 
-    # 2) في docDefaults > rPrDefault > rPr، نضبط حجم الخطّ المركّب
-    text = re.sub(
-        r'(<w:szCs w:val=")24(" />)',
-        rf'\g<1>{BODY_FONT_SIZE_HALFPOINTS}\g<2>',
-        text,
-        count=1,
-    )
-    text = re.sub(
-        r'(<w:sz w:val=")24(" />)',
-        rf'\g<1>{BODY_FONT_SIZE_HALFPOINTS}\g<2>',
-        text,
-        count=1,
-    )
+    # -------- (2) Title: عنوان الكتاب — كبير، وسط، عريض، أسود --------
+    title_style = f'''<w:style w:type="paragraph" w:styleId="Title">
+    <w:name w:val="Title" />
+    <w:basedOn w:val="Normal" />
+    <w:next w:val="Author" />
+    <w:qFormat />
+    <w:pPr>
+      <w:bidi />
+      <w:keepNext />
+      <w:keepLines />
+      <w:pageBreakBefore />
+      <w:spacing w:before="3600" w:after="800" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
+      <w:jc w:val="center" />
+    </w:pPr>
+    {font_run(SZ_TITLE, bold=True, color="1F4E79")}
+  </w:style>'''
+    text = replace_style(text, "Title", title_style)
 
-    # 3) في pPrDefault، نضيف <w:bidi/> ليصبح كلّ الفقرات بالاتّجاه العربيّ
-    text = text.replace(
-        "<w:pPrDefault>\n      <w:pPr>\n        <w:spacing w:after=\"200\" />\n      </w:pPr>\n    </w:pPrDefault>",
-        '<w:pPrDefault>\n      <w:pPr>\n        <w:bidi />\n        <w:spacing w:after="200" />\n        <w:jc w:val="both" />\n      </w:pPr>\n    </w:pPrDefault>',
-    )
+    # -------- (3) Subtitle --------
+    subtitle_style = f'''<w:style w:type="paragraph" w:styleId="Subtitle">
+    <w:name w:val="Subtitle" />
+    <w:basedOn w:val="Normal" />
+    <w:next w:val="Author" />
+    <w:qFormat />
+    <w:pPr>
+      <w:bidi />
+      <w:keepNext />
+      <w:pageBreakBefore w:val="0" />
+      <w:spacing w:before="600" w:after="400" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
+      <w:jc w:val="center" />
+    </w:pPr>
+    {font_run(SZ_SUBTITLE, italic=True)}
+  </w:style>'''
+    text = replace_style(text, "Subtitle", subtitle_style)
 
-    # 4) في كلّ نمط (style) من نوع paragraph، نضيف <w:bidi/> داخل w:pPr إن لم يكن موجودًا.
-    #    نستعمل خاصّيّة جانبيّة: إن كان للنمط w:pPr نضع bidi في أوّله؛ وإن لم يكن، نضيفه.
+    # -------- (4) Author --------
+    author_style = f'''<w:style w:type="paragraph" w:customStyle="1" w:styleId="Author">
+    <w:name w:val="Author" />
+    <w:basedOn w:val="Normal" />
+    <w:next w:val="BodyText" />
+    <w:qFormat />
+    <w:pPr>
+      <w:bidi />
+      <w:pageBreakBefore w:val="0" />
+      <w:spacing w:before="200" w:after="2400" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
+      <w:jc w:val="center" />
+    </w:pPr>
+    {font_run(SZ_AUTHOR, bold=True)}
+  </w:style>'''
+    text = replace_style(text, "Author", author_style)
+
+    # -------- (5) Heading1: الأقسام (#) — صفحة جديدة، وسط، كبير --------
+    h1_style = f'''<w:style w:type="paragraph" w:styleId="Heading1">
+    <w:name w:val="Heading 1" />
+    <w:basedOn w:val="Normal" />
+    <w:next w:val="BodyText" />
+    <w:qFormat />
+    <w:pPr>
+      <w:bidi />
+      <w:keepNext />
+      <w:keepLines />
+      <w:pageBreakBefore />
+      <w:spacing w:before="3600" w:after="1200" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
+      <w:jc w:val="center" />
+      <w:outlineLvl w:val="0" />
+    </w:pPr>
+    {font_run(SZ_H1, bold=True, color="1F4E79")}
+  </w:style>'''
+    text = replace_style(text, "Heading1", h1_style)
+
+    # -------- (6) Heading2: الفصول (##) — صفحة جديدة، وسط --------
+    h2_style = f'''<w:style w:type="paragraph" w:styleId="Heading2">
+    <w:name w:val="Heading 2" />
+    <w:basedOn w:val="Normal" />
+    <w:next w:val="FirstParagraph" />
+    <w:qFormat />
+    <w:pPr>
+      <w:bidi />
+      <w:keepNext />
+      <w:keepLines />
+      <w:pageBreakBefore />
+      <w:spacing w:before="2400" w:after="800" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
+      <w:jc w:val="center" />
+      <w:outlineLvl w:val="1" />
+    </w:pPr>
+    {font_run(SZ_H2, bold=True, color="1F4E79")}
+  </w:style>'''
+    text = replace_style(text, "Heading2", h2_style)
+
+    # -------- (7) Heading3: العناوين الفرعيّة (###) — وسط، مائل --------
+    h3_style = f'''<w:style w:type="paragraph" w:styleId="Heading3">
+    <w:name w:val="Heading 3" />
+    <w:basedOn w:val="Normal" />
+    <w:next w:val="FirstParagraph" />
+    <w:qFormat />
+    <w:pPr>
+      <w:bidi />
+      <w:keepNext />
+      <w:keepLines />
+      <w:spacing w:before="600" w:after="240" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
+      <w:jc w:val="center" />
+      <w:outlineLvl w:val="2" />
+    </w:pPr>
+    {font_run(SZ_H3, bold=True, italic=True, color="2E75B6")}
+  </w:style>'''
+    text = replace_style(text, "Heading3", h3_style)
+
+    # -------- (8) BodyText: متن الرواية — مضبوط مع مسافة بادئة --------
+    body_style = f'''<w:style w:type="paragraph" w:styleId="BodyText">
+    <w:name w:val="Body Text" />
+    <w:basedOn w:val="Normal" />
+    <w:link w:val="BodyTextChar" />
+    <w:qFormat />
+    <w:pPr>
+      <w:bidi />
+      <w:spacing w:before="0" w:after="0" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
+      <w:ind w:firstLine="{FIRST_LINE_INDENT}" />
+      <w:jc w:val="both" />
+    </w:pPr>
+    {font_run(SZ_BODY)}
+  </w:style>'''
+    text = replace_style(text, "BodyText", body_style)
+
+    # -------- (9) FirstParagraph: أوّل فقرة بعد عنوان (لا مسافة بادئة) --------
+    first_para_style = f'''<w:style w:type="paragraph" w:customStyle="1" w:styleId="FirstParagraph">
+    <w:name w:val="First Paragraph" />
+    <w:basedOn w:val="BodyText" />
+    <w:next w:val="BodyText" />
+    <w:qFormat />
+    <w:pPr>
+      <w:bidi />
+      <w:spacing w:before="240" w:after="0" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
+      <w:ind w:firstLine="0" />
+      <w:jc w:val="both" />
+    </w:pPr>
+    {font_run(SZ_FIRST_PARA)}
+  </w:style>'''
+    text = replace_style(text, "FirstParagraph", first_para_style)
+
+    # -------- (10) BlockText: الاقتباسات/الإهداء — وسط، مائل --------
+    block_text_style = f'''<w:style w:type="paragraph" w:styleId="BlockText">
+    <w:name w:val="Block Text" />
+    <w:basedOn w:val="Normal" />
+    <w:qFormat />
+    <w:pPr>
+      <w:bidi />
+      <w:spacing w:before="240" w:after="240" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
+      <w:ind w:left="567" w:right="567" />
+      <w:jc w:val="center" />
+    </w:pPr>
+    {font_run(SZ_BLOCK, italic=True, color="3F3F3F")}
+  </w:style>'''
+    text = replace_style(text, "BlockText", block_text_style)
+
+    # -------- (10b) GroupHeading: عناوين فرعيّة في الفهرس/دليل الشخصيّات --------
+    group_heading_style = f'''<w:style w:type="paragraph" w:customStyle="1" w:styleId="GroupHeading">
+    <w:name w:val="Group Heading" />
+    <w:basedOn w:val="Normal" />
+    <w:next w:val="Normal" />
+    <w:qFormat />
+    <w:pPr>
+      <w:bidi />
+      <w:keepNext />
+      <w:keepLines />
+      <w:spacing w:before="480" w:after="240" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
+      <w:jc w:val="center" />
+    </w:pPr>
+    {font_run(SZ_H3, bold=True, color="1F4E79")}
+  </w:style>'''
+    text = replace_style(text, "GroupHeading", group_heading_style)
+
+    # -------- (11) إضافة <w:bidi/> للأنماط المتبقّية --------
     def add_bidi_to_style(m: re.Match[str]) -> str:
         block = m.group(0)
-        # إن وُجد bidi مسبقًا، لا تكرّره
         if "<w:bidi" in block:
             return block
-        # إن وُجد <w:pPr>، أضف <w:bidi/> داخله
         if "<w:pPr>" in block:
             return block.replace("<w:pPr>", "<w:pPr>\n      <w:bidi />", 1)
-        # وإلّا أضف <w:pPr><w:bidi/></w:pPr> قبل إغلاق w:style
-        return block.replace(
-            "</w:style>", "<w:pPr><w:bidi /></w:pPr></w:style>", 1
-        )
+        return block.replace("</w:style>", "<w:pPr><w:bidi /></w:pPr></w:style>", 1)
 
     text = re.sub(
         r'<w:style w:type="paragraph"[^>]*>.*?</w:style>',
@@ -133,36 +343,27 @@ def patch_styles_xml(path: Path) -> None:
         flags=re.DOTALL,
     )
 
-    # 5) ضبط محاذاة العناوين والمتن
-    #    العنوان الرئيسيّ (Title) - وسط
-    #    العناوين 1-3 - يمين
-    #    المتن - مضبوط (justify) من الجهتين
-
     path.write_text(text, encoding="utf-8")
 
 
 def patch_settings_xml(path: Path) -> None:
     """يضبط لغة الواجهة العربيّة وخصائص المستند."""
     text = path.read_text(encoding="utf-8")
-
-    # ضبط ثيم اللغة العربيّة
     text = text.replace(
         '<w:themeFontLang w:val="en-US" />',
         '<w:themeFontLang w:val="en-US" w:bidi="ar-SA" />',
     )
-
-    # تشغيل دعم الـ Bidi
     if "<w:bidi" not in text:
-        text = text.replace(
-            "</w:settings>",
-            '<w:bidi />\n</w:settings>',
-        )
-
+        text = text.replace("</w:settings>", "<w:bidi />\n</w:settings>")
     path.write_text(text, encoding="utf-8")
 
 
+# ============================================================
+# تعديل docx الناتج (لا يتأثّر بالقالب المرجعيّ)
+# ============================================================
+
 def patch_generated_docx(docx_path: Path) -> None:
-    """بعد توليد الـdocx من pandoc، نضبط خصائص الصفحة (RTL، حجم، هوامش)."""
+    """بعد توليد الـdocx من pandoc، نضبط خصائص الصفحة (RTL، حجم، هوامش، تجليد)."""
     work_dir = ROOT / "scripts" / "_outdocx_work"
     if work_dir.exists():
         shutil.rmtree(work_dir)
@@ -172,39 +373,121 @@ def patch_generated_docx(docx_path: Path) -> None:
 
     patch_document_xml(work_dir / "word" / "document.xml")
 
-    # إعادة الضغط
     docx_path.unlink()
     with zipfile.ZipFile(docx_path, "w", zipfile.ZIP_DEFLATED) as z:
         for path in sorted(work_dir.rglob("*")):
             if path.is_file():
                 z.write(path, path.relative_to(work_dir).as_posix())
-
     shutil.rmtree(work_dir)
 
 
+def _apply_group_heading(text: str) -> str:
+    """يطبّق نمط GroupHeading على الفقرات التي محتواها كلّه run واحد بنصّ عريض.
+
+    يلتقط الفقرات على شكل:
+        <w:p><w:pPr>…</w:pPr><w:r><w:rPr><w:b /><w:bCs/></w:rPr><w:t>…</w:t></w:r></w:p>
+    حيث لا يوجد إلّا run واحد في الفقرة، ويستبدل pStyle (إن وُجد) بـ GroupHeading.
+    """
+    pattern = re.compile(
+        r'<w:p>'
+        r'(?P<ppr><w:pPr>(?:(?!</w:pPr>).)*</w:pPr>)?'
+        r'<w:r>'
+        r'<w:rPr>(?P<rpr>(?:\s*<w:b\s*/>\s*|\s*<w:bCs\s*/>\s*)+)</w:rPr>'
+        r'<w:t(?P<tattr>[^>]*)>(?P<txt>[^<]+)</w:t>'
+        r'</w:r>'
+        r'</w:p>',
+        flags=re.DOTALL,
+    )
+
+    def repl(m: re.Match[str]) -> str:
+        # نتجاهل الفقرات داخل عناصر القائمة (التي لها numPr) — لكن أصلًا الـ regex
+        # يلتقط فقرات بـ run واحد فقط، فالقوائم (التي تحوي bullet + text) لن تُلتقط.
+        return (
+            f'<w:p><w:pPr><w:pStyle w:val="GroupHeading" /></w:pPr>'
+            f'<w:r><w:t{m.group("tattr")}>{m.group("txt")}</w:t></w:r></w:p>'
+        )
+
+    return pattern.sub(repl, text)
+
+
+def _style_title_page(text: str) -> str:
+    """يطبّق نمطَي Subtitle/Author على صفحة العنوان (الفقرتين بعد عنوان الكتاب)."""
+    # «رواية» (مائلة) → Subtitle
+    text = re.sub(
+        r'<w:p>(?:<w:pPr>(?:(?!</w:pPr>).)*</w:pPr>)?<w:r><w:rPr>'
+        r'(?:\s*<w:i\s*/>\s*|\s*<w:iCs\s*/>\s*)+</w:rPr>'
+        r'<w:t([^>]*)>([^<]*رواية[^<]*)</w:t></w:r></w:p>',
+        lambda m: (
+            f'<w:p><w:pPr><w:pStyle w:val="Subtitle" /></w:pPr>'
+            f'<w:r><w:t{m.group(1)}>{m.group(2)}</w:t></w:r></w:p>'
+        ),
+        text,
+        count=1,
+        flags=re.DOTALL,
+    )
+    # ملاحظة: «أحمد علام» (عريضة) سَيلتقطه _apply_group_heading قبل هذه الدالة،
+    # فنُعيد استبدال GroupHeading بـ Author لأنّه على صفحة العنوان.
+    text = re.sub(
+        r'<w:p><w:pPr><w:pStyle w:val="GroupHeading" /></w:pPr>'
+        r'<w:r><w:t([^>]*)>([^<]*أحمد علام[^<]*)</w:t></w:r></w:p>',
+        lambda m: (
+            f'<w:p><w:pPr><w:pStyle w:val="Author" /></w:pPr>'
+            f'<w:r><w:t{m.group(1)}>{m.group(2)}</w:t></w:r></w:p>'
+        ),
+        text,
+        count=1,
+    )
+    return text
+
+
+def _strip_redundant_horizontal_rules(text: str) -> str:
+    """يحذف فقرات الخطّ الأفقيّ (---) التي تسبق عنوانًا يبدأ صفحة جديدة.
+
+    سبب الحذف: العنوان نفسه يكسر الصفحة، فالفاصل يصير وحيدًا في صفحة سابقة.
+    """
+    # Pattern لخطّ أفقيّ من Pandoc (يستعمل v:rect ضمن w:pict)
+    hr_pattern = r'<w:p><w:r><w:pict>(?:(?!</w:pict>).)*</w:pict></w:r></w:p>'
+    # متبوع بفقرة تبدأ صفحة جديدة (Title/Heading1/Heading2)
+    next_pagebreak = (
+        r'(?=<w:p><w:pPr><w:pStyle w:val="(?:Title|Heading1|Heading2)"\s*/>)'
+    )
+    text = re.sub(hr_pattern + next_pagebreak, "", text, flags=re.DOTALL)
+    return text
+
+
 def patch_document_xml(path: Path) -> None:
-    """يضبط sectPr (خصائص المقطع/الصفحة) لتكون عربيّة RTL وبهوامش كتاب."""
+    """يضبط sectPr وأنماط الفقرات الخاصّة (عناوين فرعيّة، صفحة عنوان…)."""
     text = path.read_text(encoding="utf-8")
 
-    # هوامش مناسبة للنشر العربيّ (للكتب: حوالي ٢٫٥سم من كلّ جهة)
-    # القيم بـ twips (1 inch = 1440 twips، 1 cm ≈ 567 twips)
-    page_size = '<w:pgSz w:w="11906" w:h="16838" />'  # A4: 21.0 × 29.7 cm
+    # --- (1) فقرات «عنوان مجموعة» (bold-only في المنتصف) ---
+    # نُعطي أيّ فقرة محتواها كلّه run واحد بـ <w:b/> نمطَ GroupHeading.
+    text = _apply_group_heading(text)
+
+    # --- (2) صفحة العنوان: «رواية» و«أحمد علام» في الوسط ---
+    text = _style_title_page(text)
+
+    # --- (3) إزالة الخطوط الفاصلة الزائدة قبل العناوين التي تبدأ صفحة جديدة ---
+    text = _strip_redundant_horizontal_rules(text)
+
+    page_size = f'<w:pgSz w:w="{PAGE_W}" w:h="{PAGE_H}" />'
+    # هوامش مرآويّة: w:gutter ليس مفيدًا هنا — نضبط top/right/bottom/left
+    # في كتاب عربيّ مجلَّد على اليمين: العمود اليمين = داخل (inner)، اليسار = خارج (outer)
     page_margin = (
-        '<w:pgMar w:top="1418" w:right="1418" w:bottom="1418" '
-        'w:left="1418" w:header="708" w:footer="708" w:gutter="0" />'
+        f'<w:pgMar w:top="{MARGIN_TOP}" w:right="{MARGIN_INNER}" '
+        f'w:bottom="{MARGIN_BOTTOM}" w:left="{MARGIN_OUTER}" '
+        f'w:header="{MARGIN_HEADER}" w:footer="{MARGIN_FOOTER}" w:gutter="0" />'
     )
 
     new_sect_pr = (
         f'<w:sectPr>'
         f'{page_size}'
         f'{page_margin}'
-        f'<w:bidi />'  # اتّجاه المقطع من اليمين إلى اليسار
+        f'<w:bidi />'
         f'<w:cols w:space="708" />'
         f'<w:docGrid w:linePitch="360" />'
         f'</w:sectPr>'
     )
 
-    # إذا كان هناك sectPr مسبق (سواء self-closing أو لا)، استبدله؛ وإلّا أضفه قبل </w:body>
     if re.search(r"<w:sectPr\b[^>]*?/>", text):
         text = re.sub(r"<w:sectPr\b[^>]*?/>", new_sect_pr, text)
     elif "<w:sectPr" in text:
@@ -215,8 +498,12 @@ def patch_document_xml(path: Path) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+# ============================================================
+# نقطة الدخول
+# ============================================================
+
 def generate() -> None:
-    print("== توليد reference docx عربيّ RTL ==")
+    print("== توليد القالب المرجعيّ (reference-rtl.docx) ==")
     ref = make_reference_docx()
     print(f"  reference: {ref.relative_to(ROOT)}")
 
@@ -234,7 +521,7 @@ def generate() -> None:
     )
     print(f"  generated: {TARGET_DOCX.relative_to(ROOT)}")
 
-    print("== ضبط خصائص الصفحة (RTL، A4، هوامش) ==")
+    print("== ضبط خصائص الصفحة (RTL، A5، هوامش كتاب) ==")
     patch_generated_docx(TARGET_DOCX)
     print("  done")
 
