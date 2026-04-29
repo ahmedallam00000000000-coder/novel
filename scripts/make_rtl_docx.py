@@ -64,6 +64,18 @@ LINE_HEIGHT = "360"
 # المسافة البادئة لأوّل سطر في فقرات المتن (twips)، 567 = 1سم
 FIRST_LINE_INDENT = "567"
 
+# ================== لوحة الألوان ==================
+# لون أساسيّ للعناوين (أزرق ليليّ هادئ — يستحضر ليلَ طِيبَة).
+COLOR_PRIMARY = "1F4E79"
+# لون ثانويّ مساعد (أزرق فيروزيّ خفيف — للعناوين الفرعيّة).
+COLOR_SECONDARY = "2E75B6"
+# لون ذهبيّ زخرفيّ (مستوحى من ذهب الفراعنة — يستعمل في الحدود والزخارف).
+COLOR_GOLD = "C9A227"
+# لون رماديّ خفيف للترويسات والتذييلات.
+COLOR_MUTED = "8C8C8C"
+# لون داكن لنصوص الاقتباسات.
+COLOR_QUOTE = "3F3F3F"
+
 
 # ============================================================
 # توليد القالب المرجعيّ (reference-rtl.docx)
@@ -109,8 +121,19 @@ def replace_style(text: str, style_id: str, new_block: str) -> str:
     return re.sub(pattern, lambda m: new_block, text, count=1, flags=re.DOTALL)
 
 
-def font_run(size: str, *, bold: bool = False, italic: bool = False, color: str | None = None) -> str:
-    """يبني <w:rPr> مع خطّ عربيّ وحجم وخصائص اختياريّة."""
+def font_run(
+    size: str,
+    *,
+    bold: bool = False,
+    italic: bool = False,
+    color: str | None = None,
+    tracking: str | None = None,
+) -> str:
+    """يبني <w:rPr> مع خطّ عربيّ وحجم وخصائص اختياريّة.
+
+    `tracking` (تباعد حروف بالـtwips × 20؛ مثلًا "60" ≈ 3pt extra) يفيد لطباعة
+    العناوين الفاخرة على طريقة دور النشر المحترفة.
+    """
     parts = [f'<w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" '
              f'w:cs="{ARABIC_BODY_FONT}" />']
     if bold:
@@ -121,6 +144,8 @@ def font_run(size: str, *, bold: bool = False, italic: bool = False, color: str 
         parts.append('<w:iCs />')
     if color:
         parts.append(f'<w:color w:val="{color}" />')
+    if tracking:
+        parts.append(f'<w:spacing w:val="{tracking}" />')
     parts.append(f'<w:sz w:val="{size}" />')
     parts.append(f'<w:szCs w:val="{size}" />')
     return "<w:rPr>" + "".join(parts) + "</w:rPr>"
@@ -143,8 +168,13 @@ def patch_styles_xml(path: Path) -> None:
     <w:pPrDefault>
       <w:pPr>
         <w:bidi />
+        <w:widowControl />
+        <w:autoSpaceDE w:val="0" />
+        <w:autoSpaceDN w:val="0" />
+        <w:adjustRightInd w:val="0" />
         <w:spacing w:before="0" w:after="120" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
         <w:jc w:val="both" />
+        <w:textAlignment w:val="baseline" />
       </w:pPr>
     </w:pPrDefault>
   </w:docDefaults>'''
@@ -166,11 +196,12 @@ def patch_styles_xml(path: Path) -> None:
       <w:bidi />
       <w:keepNext />
       <w:keepLines />
+      <w:widowControl />
       <w:pageBreakBefore />
       <w:spacing w:before="3600" w:after="800" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
       <w:jc w:val="center" />
     </w:pPr>
-    {font_run(SZ_TITLE, bold=True, color="1F4E79")}
+    {font_run(SZ_TITLE, bold=True, color=COLOR_PRIMARY, tracking="100")}
   </w:style>'''
     text = replace_style(text, "Title", title_style)
 
@@ -183,11 +214,12 @@ def patch_styles_xml(path: Path) -> None:
     <w:pPr>
       <w:bidi />
       <w:keepNext />
+      <w:widowControl />
       <w:pageBreakBefore w:val="0" />
       <w:spacing w:before="600" w:after="400" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
       <w:jc w:val="center" />
     </w:pPr>
-    {font_run(SZ_SUBTITLE, italic=True)}
+    {font_run(SZ_SUBTITLE, italic=True, color=COLOR_GOLD, tracking="120")}
   </w:style>'''
     text = replace_style(text, "Subtitle", subtitle_style)
 
@@ -199,11 +231,12 @@ def patch_styles_xml(path: Path) -> None:
     <w:qFormat />
     <w:pPr>
       <w:bidi />
+      <w:widowControl />
       <w:pageBreakBefore w:val="0" />
       <w:spacing w:before="200" w:after="2400" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
       <w:jc w:val="center" />
     </w:pPr>
-    {font_run(SZ_AUTHOR, bold=True)}
+    {font_run(SZ_AUTHOR, bold=True, color=COLOR_PRIMARY, tracking="80")}
   </w:style>'''
     text = replace_style(text, "Author", author_style)
 
@@ -217,12 +250,17 @@ def patch_styles_xml(path: Path) -> None:
       <w:bidi />
       <w:keepNext />
       <w:keepLines />
+      <w:widowControl />
       <w:pageBreakBefore />
+      <w:pBdr>
+        <w:top w:val="double" w:sz="6" w:space="14" w:color="{COLOR_GOLD}" />
+        <w:bottom w:val="double" w:sz="6" w:space="14" w:color="{COLOR_GOLD}" />
+      </w:pBdr>
       <w:spacing w:before="3600" w:after="1200" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
       <w:jc w:val="center" />
       <w:outlineLvl w:val="0" />
     </w:pPr>
-    {font_run(SZ_H1, bold=True, color="1F4E79")}
+    {font_run(SZ_H1, bold=True, color=COLOR_PRIMARY, tracking="100")}
   </w:style>'''
     text = replace_style(text, "Heading1", h1_style)
 
@@ -236,12 +274,16 @@ def patch_styles_xml(path: Path) -> None:
       <w:bidi />
       <w:keepNext />
       <w:keepLines />
+      <w:widowControl />
       <w:pageBreakBefore />
+      <w:pBdr>
+        <w:bottom w:val="single" w:sz="8" w:space="14" w:color="{COLOR_GOLD}" />
+      </w:pBdr>
       <w:spacing w:before="2400" w:after="800" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
       <w:jc w:val="center" />
       <w:outlineLvl w:val="1" />
     </w:pPr>
-    {font_run(SZ_H2, bold=True, color="1F4E79")}
+    {font_run(SZ_H2, bold=True, color=COLOR_PRIMARY, tracking="80")}
   </w:style>'''
     text = replace_style(text, "Heading2", h2_style)
 
@@ -255,11 +297,12 @@ def patch_styles_xml(path: Path) -> None:
       <w:bidi />
       <w:keepNext />
       <w:keepLines />
+      <w:widowControl />
       <w:spacing w:before="600" w:after="240" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
       <w:jc w:val="center" />
       <w:outlineLvl w:val="2" />
     </w:pPr>
-    {font_run(SZ_H3, bold=True, italic=True, color="2E75B6")}
+    {font_run(SZ_H3, bold=True, italic=True, color=COLOR_SECONDARY, tracking="40")}
   </w:style>'''
     text = replace_style(text, "Heading3", h3_style)
 
@@ -271,6 +314,7 @@ def patch_styles_xml(path: Path) -> None:
     <w:qFormat />
     <w:pPr>
       <w:bidi />
+      <w:widowControl />
       <w:spacing w:before="0" w:after="0" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
       <w:ind w:firstLine="{FIRST_LINE_INDENT}" />
       <w:jc w:val="both" />
@@ -287,7 +331,8 @@ def patch_styles_xml(path: Path) -> None:
     <w:qFormat />
     <w:pPr>
       <w:bidi />
-      <w:spacing w:before="240" w:after="0" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
+      <w:widowControl />
+      <w:spacing w:before="360" w:after="0" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
       <w:ind w:firstLine="0" />
       <w:jc w:val="both" />
     </w:pPr>
@@ -302,11 +347,17 @@ def patch_styles_xml(path: Path) -> None:
     <w:qFormat />
     <w:pPr>
       <w:bidi />
-      <w:spacing w:before="240" w:after="240" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
-      <w:ind w:left="567" w:right="567" />
+      <w:widowControl />
+      <w:keepLines />
+      <w:pBdr>
+        <w:top w:val="single" w:sz="4" w:space="10" w:color="{COLOR_GOLD}" />
+        <w:bottom w:val="single" w:sz="4" w:space="10" w:color="{COLOR_GOLD}" />
+      </w:pBdr>
+      <w:spacing w:before="360" w:after="360" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
+      <w:ind w:left="850" w:right="850" />
       <w:jc w:val="center" />
     </w:pPr>
-    {font_run(SZ_BLOCK, italic=True, color="3F3F3F")}
+    {font_run(SZ_BLOCK, italic=True, color=COLOR_QUOTE)}
   </w:style>'''
     text = replace_style(text, "BlockText", block_text_style)
 
@@ -320,10 +371,11 @@ def patch_styles_xml(path: Path) -> None:
       <w:bidi />
       <w:keepNext />
       <w:keepLines />
+      <w:widowControl />
       <w:spacing w:before="480" w:after="240" w:line="{LINE_HEIGHT}" w:lineRule="auto" />
       <w:jc w:val="center" />
     </w:pPr>
-    {font_run(SZ_H3, bold=True, color="1F4E79")}
+    {font_run(SZ_H3, bold=True, color=COLOR_PRIMARY, tracking="60")}
   </w:style>'''
     text = replace_style(text, "GroupHeading", group_heading_style)
 
@@ -347,7 +399,7 @@ def patch_styles_xml(path: Path) -> None:
 
 
 def patch_settings_xml(path: Path) -> None:
-    """يضبط لغة الواجهة العربيّة وخصائص المستند."""
+    """يضبط لغة الواجهة العربيّة، خصائص المستند، ورؤوس مُتبايِنة للصفحات الزوجيّة/الفرديّة."""
     text = path.read_text(encoding="utf-8")
     text = text.replace(
         '<w:themeFontLang w:val="en-US" />',
@@ -355,6 +407,17 @@ def patch_settings_xml(path: Path) -> None:
     )
     if "<w:bidi" not in text:
         text = text.replace("</w:settings>", "<w:bidi />\n</w:settings>")
+    # رؤوس وتذييلات مختلفة بين الصفحات الزوجيّة (verso) والفرديّة (recto) —
+    # تَقليدٌ راسِخٌ في النَّشر الاحترافيّ: الكتاب على الجِهة الزَّوجيّة،
+    # واسم الفصل الجاري على الفرديّة.
+    if "<w:evenAndOddHeaders" not in text:
+        text = text.replace("</w:settings>", "<w:evenAndOddHeaders />\n</w:settings>")
+    # اِسمَح بحقول STYLEREF بأن تَتحدَّث تِلقائيًّا عند فتح الملف.
+    if "<w:updateFields" not in text:
+        text = text.replace(
+            "</w:settings>",
+            '<w:updateFields w:val="true" />\n</w:settings>',
+        )
     path.write_text(text, encoding="utf-8")
 
 
@@ -386,34 +449,99 @@ def patch_generated_docx(docx_path: Path) -> None:
 # الرؤوس والتذييلات وأرقام الصفحات
 # ============================================================
 
-# عنوان الكتاب — يَظهَرُ في رَأسِ الصَّفحة في كلِّ صفحات الكتاب ما عدا الأَوائل.
+# عنوان الكتاب — يَظهَرُ في رَأسِ الصَّفحة الزَّوجيّة (يَسار الكِتاب).
 HEADER_TITLE = "غريب في طيبة"
 
-# قالب رأس الصفحة (عنوان الكتاب وسط، خطّ Amiri صغير، اتّجاه RTL، حدّ سُفليّ خفيف)
-HEADER_DEFAULT_XML = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+
+# ـــــ رأس الصَّفحة الفَرديّة (recto / يَمين الكِتاب) ـــــ
+# يَعرِضُ اسمَ الفَصلِ الجاري تلقائيًّا عبر حَقل STYLEREF "Heading 2".
+# هذا تَقليدٌ راسِخٌ في النَّشرِ الاحترافيّ: القارئُ يَلمَحُ اسمَ الفَصلِ
+# مع كلِّ تَقليبَةِ صفحة، فَلا يَضِلُّ في كِتابٍ طَويل.
+HEADER_ODD_XML = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:p>
     <w:pPr>
       <w:bidi />
       <w:jc w:val="center" />
       <w:pBdr>
-        <w:bottom w:val="single" w:sz="4" w:space="4" w:color="999999" />
+        <w:bottom w:val="single" w:sz="6" w:space="6" w:color="{COLOR_GOLD}" />
       </w:pBdr>
       <w:spacing w:before="0" w:after="120" />
     </w:pPr>
     <w:r>
       <w:rPr>
         <w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" w:cs="{ARABIC_BODY_FONT}" />
-        <w:i />
-        <w:iCs />
-        <w:color w:val="666666" />
-        <w:sz w:val="20" />
-        <w:szCs w:val="20" />
+        <w:i /><w:iCs />
+        <w:color w:val="{COLOR_MUTED}" />
+        <w:sz w:val="20" /><w:szCs w:val="20" />
+        <w:spacing w:val="40" />
+      </w:rPr>
+      <w:fldChar w:fldCharType="begin" />
+    </w:r>
+    <w:r>
+      <w:rPr>
+        <w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" w:cs="{ARABIC_BODY_FONT}" />
+        <w:i /><w:iCs />
+        <w:color w:val="{COLOR_MUTED}" />
+        <w:sz w:val="20" /><w:szCs w:val="20" />
+      </w:rPr>
+      <w:instrText xml:space="preserve"> STYLEREF "Heading 2" \\* MERGEFORMAT </w:instrText>
+    </w:r>
+    <w:r>
+      <w:rPr>
+        <w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" w:cs="{ARABIC_BODY_FONT}" />
+        <w:i /><w:iCs />
+        <w:color w:val="{COLOR_MUTED}" />
+        <w:sz w:val="20" /><w:szCs w:val="20" />
+      </w:rPr>
+      <w:fldChar w:fldCharType="separate" />
+    </w:r>
+    <w:r>
+      <w:rPr>
+        <w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" w:cs="{ARABIC_BODY_FONT}" />
+        <w:i /><w:iCs />
+        <w:color w:val="{COLOR_MUTED}" />
+        <w:sz w:val="20" /><w:szCs w:val="20" />
+        <w:spacing w:val="40" />
+      </w:rPr>
+      <w:t xml:space="preserve">{HEADER_TITLE}</w:t>
+    </w:r>
+    <w:r>
+      <w:rPr>
+        <w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" w:cs="{ARABIC_BODY_FONT}" />
+      </w:rPr>
+      <w:fldChar w:fldCharType="end" />
+    </w:r>
+  </w:p>
+</w:hdr>'''
+
+
+# ـــــ رأس الصَّفحة الزَّوجيّة (verso / يَسار الكِتاب) ـــــ
+# عنوانُ الكتاب — ثابتٌ في كلِّ الصَّفحات الزَّوجيّة بلون ذَهبيٍّ خَفيف.
+HEADER_EVEN_XML = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr>
+      <w:bidi />
+      <w:jc w:val="center" />
+      <w:pBdr>
+        <w:bottom w:val="single" w:sz="6" w:space="6" w:color="{COLOR_GOLD}" />
+      </w:pBdr>
+      <w:spacing w:before="0" w:after="120" />
+    </w:pPr>
+    <w:r>
+      <w:rPr>
+        <w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" w:cs="{ARABIC_BODY_FONT}" />
+        <w:i /><w:iCs />
+        <w:color w:val="{COLOR_GOLD}" />
+        <w:sz w:val="20" /><w:szCs w:val="20" />
+        <w:spacing w:val="100" />
       </w:rPr>
       <w:t xml:space="preserve">{HEADER_TITLE}</w:t>
     </w:r>
   </w:p>
 </w:hdr>'''
+
 
 # رأس صفحة الـفصل/العنوان (فارغ — لا نريد رأسًا فوق صفحة بداية الفصل)
 HEADER_EMPTY_XML = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -423,7 +551,8 @@ HEADER_EMPTY_XML = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
   </w:p>
 </w:hdr>'''
 
-# تَذييل افتراضيّ — رَقم الصَّفحة في المُنتَصَف بِالأَرقام العربيّة-الهنديّة (١٢٣)
+# تَذييل افتراضيّ — رَقم الصَّفحة محاطٌ بزخرفة ذَهبيّة (• ٣ •) في المُنتَصَف،
+# بِالأَرقام العربيّة-الهِنديّة (١٢٣).
 FOOTER_DEFAULT_XML = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:p>
@@ -435,29 +564,43 @@ FOOTER_DEFAULT_XML = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <w:r>
       <w:rPr>
         <w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" w:cs="{ARABIC_BODY_FONT}" />
-        <w:color w:val="666666" />
-        <w:sz w:val="20" />
-        <w:szCs w:val="20" />
+        <w:color w:val="{COLOR_GOLD}" />
+        <w:sz w:val="20" /><w:szCs w:val="20" />
+      </w:rPr>
+      <w:t xml:space="preserve">  ❖  </w:t>
+    </w:r>
+    <w:r>
+      <w:rPr>
+        <w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" w:cs="{ARABIC_BODY_FONT}" />
+        <w:color w:val="{COLOR_MUTED}" />
+        <w:sz w:val="22" /><w:szCs w:val="22" />
+        <w:spacing w:val="40" />
       </w:rPr>
       <w:fldChar w:fldCharType="begin" />
     </w:r>
     <w:r>
       <w:rPr>
         <w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" w:cs="{ARABIC_BODY_FONT}" />
-        <w:color w:val="666666" />
-        <w:sz w:val="20" />
-        <w:szCs w:val="20" />
+        <w:color w:val="{COLOR_MUTED}" />
+        <w:sz w:val="22" /><w:szCs w:val="22" />
       </w:rPr>
       <w:instrText xml:space="preserve"> PAGE \\* MERGEFORMAT </w:instrText>
     </w:r>
     <w:r>
       <w:rPr>
         <w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" w:cs="{ARABIC_BODY_FONT}" />
-        <w:color w:val="666666" />
-        <w:sz w:val="20" />
-        <w:szCs w:val="20" />
+        <w:color w:val="{COLOR_MUTED}" />
+        <w:sz w:val="22" /><w:szCs w:val="22" />
       </w:rPr>
       <w:fldChar w:fldCharType="end" />
+    </w:r>
+    <w:r>
+      <w:rPr>
+        <w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" w:cs="{ARABIC_BODY_FONT}" />
+        <w:color w:val="{COLOR_GOLD}" />
+        <w:sz w:val="20" /><w:szCs w:val="20" />
+      </w:rPr>
+      <w:t xml:space="preserve">  ❖  </w:t>
     </w:r>
   </w:p>
 </w:ftr>'''
@@ -480,8 +623,14 @@ def add_headers_and_footers(work_dir: Path) -> None:
     word_dir = work_dir / "word"
     rels_dir = word_dir / "_rels"
 
-    (word_dir / "header1.xml").write_text(HEADER_DEFAULT_XML, encoding="utf-8")
+    # header1 = الفَرديّة (recto، اسم الفصل)
+    # header2 = صَفحة العنوان والفصل (فارغ)
+    # header3 = الزَّوجيّة (verso، عنوان الكتاب) — جديد
+    # footer1 = افتراضيّ بِرَقم الصَّفحة المُزَخرَف
+    # footer2 = صَفحات الافتتاح (فارغ)
+    (word_dir / "header1.xml").write_text(HEADER_ODD_XML, encoding="utf-8")
     (word_dir / "header2.xml").write_text(HEADER_EMPTY_XML, encoding="utf-8")
+    (word_dir / "header3.xml").write_text(HEADER_EVEN_XML, encoding="utf-8")
     (word_dir / "footer1.xml").write_text(FOOTER_DEFAULT_XML, encoding="utf-8")
     (word_dir / "footer2.xml").write_text(FOOTER_EMPTY_XML, encoding="utf-8")
 
@@ -501,6 +650,9 @@ def add_headers_and_footers(work_dir: Path) -> None:
         '<Relationship Id="rId103" '
         'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" '
         'Target="footer2.xml" />'
+        '<Relationship Id="rId104" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" '
+        'Target="header3.xml" />'
     )
     rels_text = rels_text.replace("</Relationships>", extra_rels + "</Relationships>")
     rels_path.write_text(rels_text, encoding="utf-8")
@@ -512,6 +664,8 @@ def add_headers_and_footers(work_dir: Path) -> None:
         '<Override PartName="/word/header1.xml" '
         'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml" />'
         '<Override PartName="/word/header2.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml" />'
+        '<Override PartName="/word/header3.xml" '
         'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml" />'
         '<Override PartName="/word/footer1.xml" '
         'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml" />'
@@ -587,31 +741,143 @@ def _add_half_title_page(text: str) -> str:
     """يَحقُنُ صفحة شطر العنوان (Half-title) قبل صفحة العنوان الرئيسة.
 
     شطرُ العنوان عُرفٌ نَشريٌّ كلاسيكيّ: صفحةٌ مُنفَردة تَحوي اسمَ الكتاب وحدَه،
-    تَأتي قبل صفحة العنوان الكاملة (العنوان + المؤلف + الناشر).
+    مَتبوعًا بِزَخرَفةٍ ذَهَبيّةٍ صَغيرة، تَأتي قبل صفحة العنوان الكاملة.
     """
     half_title = (
         '<w:p>'
         '<w:pPr>'
         '<w:bidi />'
         '<w:jc w:val="center" />'
-        f'<w:spacing w:before="4800" w:after="0" w:line="{LINE_HEIGHT}" w:lineRule="auto" />'
+        f'<w:spacing w:before="4800" w:after="240" w:line="{LINE_HEIGHT}" w:lineRule="auto" />'
         '</w:pPr>'
         '<w:r>'
         '<w:rPr>'
         f'<w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" '
         f'w:cs="{ARABIC_BODY_FONT}" />'
         '<w:b /><w:bCs />'
-        '<w:color w:val="1F4E79" />'
+        f'<w:color w:val="{COLOR_PRIMARY}" />'
+        '<w:spacing w:val="120" />'
         '<w:sz w:val="56" /><w:szCs w:val="56" />'
         '</w:rPr>'
         f'<w:t xml:space="preserve">{HEADER_TITLE}</w:t>'
         '</w:r>'
         '</w:p>'
     )
+    # زَخرَفة ذَهَبيّة تحت اسم الكتاب في صفحة شطر العنوان
+    half_title_ornament = (
+        '<w:p>'
+        '<w:pPr>'
+        '<w:bidi />'
+        '<w:jc w:val="center" />'
+        '<w:spacing w:before="600" w:after="0" />'
+        '</w:pPr>'
+        '<w:r>'
+        '<w:rPr>'
+        f'<w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" '
+        f'w:cs="{ARABIC_BODY_FONT}" />'
+        f'<w:color w:val="{COLOR_GOLD}" />'
+        '<w:sz w:val="32" /><w:szCs w:val="32" />'
+        '<w:spacing w:val="240" />'
+        '</w:rPr>'
+        '<w:t xml:space="preserve">❖   ❖   ❖</w:t>'
+        '</w:r>'
+        '</w:p>'
+    )
     # نَحقُنُها مباشرةً بعد <w:body>. نمطُ Title له pageBreakBefore فيَدفَعُ
     # العنوانَ الرئيسَ إلى صفحةٍ جديدة.
-    text = text.replace("<w:body>", "<w:body>" + half_title, 1)
+    text = text.replace("<w:body>", "<w:body>" + half_title + half_title_ornament, 1)
     return text
+
+
+def _replace_hr_with_ornament(text: str) -> str:
+    """يَستَبدِلُ الخطوطَ الأُفقيّة (---) المُتَبَقِّية في وَسَط الفُصول
+    بزَخرفةٍ فاخِرة (❖   ❖   ❖) — على نَحوِ ما تَفعَلُ دورُ النَّشر العالميّة
+    لِفَواصِل المَشاهد بين أَجزاء الفصل الواحد.
+
+    تُستَدعى هذه الدَّالة بَعدَ ``_strip_redundant_horizontal_rules``، فلا تَبقى
+    إلَّا الخُطوطُ الأَفقيّة الَّتي تَفصِلُ بين مَشاهدَ في الفصل ذاتِه.
+    """
+    hr_pattern = r'<w:p><w:r><w:pict>(?:(?!</w:pict>).)*</w:pict></w:r></w:p>'
+    ornament = (
+        '<w:p>'
+        '<w:pPr>'
+        '<w:bidi />'
+        '<w:jc w:val="center" />'
+        '<w:keepLines />'
+        f'<w:spacing w:before="360" w:after="360" w:line="{LINE_HEIGHT}" w:lineRule="auto" />'
+        '<w:contextualSpacing w:val="0" />'
+        '</w:pPr>'
+        '<w:r>'
+        '<w:rPr>'
+        f'<w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" '
+        f'w:cs="{ARABIC_BODY_FONT}" />'
+        f'<w:color w:val="{COLOR_GOLD}" />'
+        '<w:sz w:val="28" /><w:szCs w:val="28" />'
+        '<w:spacing w:val="240" />'
+        '</w:rPr>'
+        '<w:t xml:space="preserve">❖   ❖   ❖</w:t>'
+        '</w:r>'
+        '</w:p>'
+    )
+    return re.sub(hr_pattern, ornament, text, flags=re.DOTALL)
+
+
+def _stylize_chapter_opening_word(text: str) -> str:
+    """يُكبِّرُ ويُلَوِّنُ أَوَّلَ كَلِمَةٍ من أَوَّل فقرةٍ في كُلِّ فَصل (FirstParagraph).
+
+    بِما أنَّ الحُروفَ العَرَبيَّةَ مُتَّصِلَة، فإنَّ Drop-cap بالحَرف الواحد —
+    على طَريقة الكُتب الإنجليزيّة — يَكسِرُ تَواصُلَ الكَلِمة. الحَلُّ الأَنيقُ
+    أن نُبرِزَ الكَلِمةَ الأُولى كامِلةً بحَجمٍ أَكبَر ولَونٍ ذَهَبيٍّ مُمَيَّز،
+    وهي عُرفٌ راسِخٌ في الكُتُب العَرَبيّة الفاخِرة.
+
+    pandoc يُولِّد فقرةَ FirstParagraph على هذا الشَّكل:
+        <w:p><w:pPr><w:pStyle w:val="FirstParagraph"/></w:pPr>
+          <w:r>[<w:rPr>...</w:rPr>]<w:t xml:space="preserve">النَّصُّ كلُّه</w:t></w:r>
+        </w:p>
+    نَقسِمُ الـrun الأَوَّل إلى runs اِثنين: أَوَّل كلمة بنمطٍ مُمَيَّز،
+    وما تَبَقَّى بنمط الفِقرة الافتراضيّ.
+    """
+    pattern = re.compile(
+        r'(<w:p><w:pPr><w:pStyle w:val="FirstParagraph"\s*/></w:pPr>)'
+        r'<w:r>'
+        r'(?:<w:rPr>(?:(?!</w:rPr>).)*</w:rPr>)?'
+        r'<w:t(?P<tattr>[^>]*)>(?P<first>[^\s<]+)(?P<rest>[^<]*)</w:t>'
+        r'</w:r>',
+        flags=re.DOTALL,
+    )
+
+    def repl(m: re.Match[str]) -> str:
+        first = m.group('first')
+        rest = m.group('rest')
+        tattr = m.group('tattr')
+        if not first:
+            return m.group(0)
+        # نَضمَنُ xml:space="preserve" حتَّى لا تَضيعَ المَسافات
+        if 'xml:space' not in tattr:
+            tattr_full = tattr + ' xml:space="preserve"'
+        else:
+            tattr_full = tattr
+
+        decorated_run = (
+            '<w:r>'
+            '<w:rPr>'
+            f'<w:rFonts w:ascii="{ARABIC_BODY_FONT}" w:hAnsi="{ARABIC_BODY_FONT}" '
+            f'w:cs="{ARABIC_BODY_FONT}" />'
+            '<w:b /><w:bCs />'
+            f'<w:color w:val="{COLOR_GOLD}" />'
+            '<w:sz w:val="36" /><w:szCs w:val="36" />'
+            '</w:rPr>'
+            f'<w:t{tattr_full}>{first}</w:t>'
+            '</w:r>'
+        )
+        rest_run = (
+            '<w:r>'
+            f'<w:t{tattr_full}>{rest}</w:t>'
+            '</w:r>'
+        )
+        return m.group(1) + decorated_run + rest_run
+
+    return pattern.sub(repl, text)
 
 
 def _split_title_section(text: str) -> str:
@@ -692,6 +958,12 @@ def patch_document_xml(path: Path) -> None:
 
     # --- (3) إزالة الخطوط الفاصلة الزائدة قبل العناوين التي تبدأ صفحة جديدة ---
     text = _strip_redundant_horizontal_rules(text)
+
+    # --- (3b) استبدال --- المُتَبَقّية (فواصل المَشاهد وَسَط الفصل) بزَخرفة ❖ ❖ ❖ ---
+    text = _replace_hr_with_ornament(text)
+
+    # --- (3c) تَكبير ولَونَنة أَوَّل كلمةٍ من أَوَّل فقرةٍ في كلّ فصل ---
+    text = _stylize_chapter_opening_word(text)
 
     # --- (4) إضافة صفحة شطر العنوان (Half-title) قبل صفحة العنوان الرَّئيسة ---
     text = _add_half_title_page(text)
