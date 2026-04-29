@@ -436,6 +436,9 @@ def patch_generated_docx(docx_path: Path) -> None:
 
     add_headers_and_footers(work_dir)
     patch_document_xml(work_dir / "word" / "document.xml")
+    # نُعيدُ تَطبيقَ patch_settings_xml على settings.xml المُولَّد من pandoc
+    # (لأنَّ pandoc قد يَحذِفُ بعض العناصر من القالب المرجعيّ).
+    patch_settings_xml(work_dir / "word" / "settings.xml")
 
     docx_path.unlink()
     with zipfile.ZipFile(docx_path, "w", zipfile.ZIP_DEFLATED) as z:
@@ -627,7 +630,7 @@ def add_headers_and_footers(work_dir: Path) -> None:
     # header2 = صَفحة العنوان والفصل (فارغ)
     # header3 = الزَّوجيّة (verso، عنوان الكتاب) — جديد
     # footer1 = افتراضيّ بِرَقم الصَّفحة المُزَخرَف
-    # footer2 = صَفحات الافتتاح (فارغ)
+    # footer2 = صَفحات الافتت��ح (فارغ)
     (word_dir / "header1.xml").write_text(HEADER_ODD_XML, encoding="utf-8")
     (word_dir / "header2.xml").write_text(HEADER_EMPTY_XML, encoding="utf-8")
     (word_dir / "header3.xml").write_text(HEADER_EVEN_XML, encoding="utf-8")
@@ -922,7 +925,7 @@ def _strip_redundant_horizontal_rules(text: str) -> str:
     حالات الحذف:
     1) خطّ أفقيّ يَلي مباشرةً فقرةَ نَمَطِ صفحة العنوان (Title/Subtitle/Author):
        صفحة العنوان مُهَنْدَسَةٌ بحيث لا تَستوعِبُ الفاصِل تَحتَ الاسم،
-       والمُتَبَقّي يُدفَعُ إلى الصفحة التَّالية فيَيتَمُ الفاصلُ في رأسها.
+       و��لمُتَبَقّي يُدفَعُ إلى الصفحة التَّالية فيَيتَمُ الفاصلُ في رأسها.
     2) خطّ أفقيّ يَسبِقُ عنوانًا يَبدَأُ صفحة جديدة (Title/Heading1/Heading2):
        العنوان نفسُه يَكسِرُ الصفحة فيُصبِحُ الفاصلُ وحيدًا في صفحةٍ سابقة.
     """
@@ -982,9 +985,12 @@ def patch_document_xml(path: Path) -> None:
     )
 
     # مَراجع الرَّأس والتَّذييل (أَنشَأناها في add_headers_and_footers).
-    # type="default" للصفحات العاديّة، type="first" لصفحة العنوان (يُفعَّل بـ<w:titlePg/>).
+    # default = الفَرديّة (recto، يَمين الكتاب) → اسم الفصل تلقائيًّا
+    # even    = الزَّوجيّة (verso، يَسار الكتاب) → عنوان الكتاب
+    # first   = صفحة بداية الفصل (فارغة) → يُفعَّل بـ<w:titlePg/>
     header_footer_refs = (
         '<w:headerReference r:id="rId100" w:type="default" />'
+        '<w:headerReference r:id="rId104" w:type="even" />'
         '<w:headerReference r:id="rId101" w:type="first" />'
         '<w:footerReference r:id="rId102" w:type="default" />'
         '<w:footerReference r:id="rId103" w:type="first" />'
