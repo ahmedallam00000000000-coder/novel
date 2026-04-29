@@ -429,7 +429,9 @@ def _style_title_page(text: str) -> str:
     # فنُعيد استبدال GroupHeading بـ Author لأنّه على صفحة العنوان.
     text = re.sub(
         r'<w:p><w:pPr><w:pStyle w:val="GroupHeading" /></w:pPr>'
-        r'<w:r><w:t([^>]*)>([^<]*أحمد علام[^<]*)</w:t></w:r></w:p>',
+        # نطابق «أحمد عل» فقط (بدون آخر الكلمة) لأنّ المصدر قد يحتوي
+        # على تشكيل (فتحة U+064E + شدّة U+0651) بين «عل» و«ام».
+        r'<w:r><w:t([^>]*)>([^<]*أحمد عل[^<]*)</w:t></w:r></w:p>',
         lambda m: (
             f'<w:p><w:pPr><w:pStyle w:val="Author" /></w:pPr>'
             f'<w:r><w:t{m.group(1)}>{m.group(2)}</w:t></w:r></w:p>'
